@@ -45,8 +45,6 @@ class MyApp extends StatelessWidget {
           switch (settings.name) {
             case '/':
               return MaterialPageRoute(builder: (_) => const SessionWrapper());
-            case '/login':
-              return MaterialPageRoute(builder: (_) => const Login());
             case '/signup':
               return MaterialPageRoute(builder: (_) => const SignUp());
             case '/dashboard':
