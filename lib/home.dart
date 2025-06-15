@@ -22,7 +22,7 @@ class Home extends StatelessWidget {
               child: const Text('Go to Signup'),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.pushNamed(context, '/dashboard'),
+              onPressed: () => Navigator.pushNamed(context, '/dashboard',),
               child: const Text('Go to Dashboard'),
             ),
             ElevatedButton(
@@ -32,6 +32,10 @@ class Home extends StatelessWidget {
             ElevatedButton(
               onPressed: () => Navigator.pushNamed(context, '/report'),
               child: const Text('Go to Report'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pushNamed(context, '/map'),
+              child: const Text('Go to Map'),
             ),
           ],
         ),

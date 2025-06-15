@@ -1,16 +1,85 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class Dashboard extends StatelessWidget {
-  const Dashboard({super.key});
+class Dashboard extends StatefulWidget {
+  final String storeId; // el ID del punto de venta
+  final String direccion;
+  final String userId; // el ID del usuario autenticado
+  const Dashboard({super.key, required this.storeId, required this.direccion, required this.userId});
+
+  @override
+  State<Dashboard> createState() => _DashboardState();
+}
+
+class _DashboardState extends State<Dashboard> {
+  final supabase = Supabase.instance.client;
+  Map<String, dynamic>? storeData;
+  DateTime? lastVisitDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStore();
+  }
+
+  Future<void> _loadStore() async {
+    // 1. Obtener datos de la tienda
+    final response = await supabase
+        .from('puntos_de_venta')
+        .select()
+        .eq('id', widget.storeId)
+        .single();
+
+    // 2. Obtener la última visita desde la tabla de reportes
+    final reportResponse = await supabase
+        .from('reportes') // Asegúrate que esta es la tabla correcta
+        .select('fecha')
+        .eq('punto_de_venta_id', widget.storeId)
+        .order('fecha', ascending: false)
+        .limit(1);
+
+    // 3. Extraer la fecha si hay resultados
+    if (reportResponse.isNotEmpty) {
+      lastVisitDate = DateTime.parse(reportResponse.first['fecha']);
+    }
+
+    setState(() {
+      storeData = response;
+    });
+  }
+
+  String _getSatisfactionMessage(double nps) {
+    if (nps < 0.2) {
+      return 'Hay muchos problemas que atender urgentemente.';
+    } else if (nps < 0.4) {
+      return 'Se identifican áreas críticas por mejorar.';
+    } else if (nps < 0.6) {
+      return 'La tienda está haciendo bien las cosas,\npero hay áreas a reforzar.';
+    } else if (nps < 0.8) {
+      return 'Buen desempeño general, pero aún se puede mejorar.';
+    } else {
+      return '¡Excelente! La tienda está superando expectativas.';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    double satisfaction = 0.5; // nivel de satisfacción (de 0.0 a 1.0)
+    if (storeData == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final nps = (storeData!['nps'] ?? 0) / 100;
+    final damageRate = storeData!['damage_rate'] ?? 0;
+    final outOfStock = storeData!['out_of_stock'] ?? 0;
+    final fillRate = storeData!['fillfoundrate'] ?? 0;
+    final nombre = storeData!['nombre'] ?? 'Tienda';
 
     return Scaffold(
       backgroundColor: const Color(0xFFFDF5F3),
       appBar: AppBar(
-        title: const Text('Nombre de tienda 1'),
+        title: Text(nombre),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -21,17 +90,17 @@ class Dashboard extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            const Text('Dirección 1', style: TextStyle(fontSize: 18)),
+            Text(widget.direccion, style: const TextStyle(fontSize: 18)),
             const SizedBox(height: 4),
-            const Text(
-              'Última visita: 06/06/2025',
-              style: TextStyle(color: Colors.grey),
+           Text(
+              'Última visita: ${lastVisitDate != null ? "${lastVisitDate!.day.toString().padLeft(2, '0')}/${lastVisitDate!.month.toString().padLeft(2, '0')}/${lastVisitDate!.year}" : "Sin visitas registradas"}',
+              style: const TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'La tienda está haciendo bien las cosas,\npero hay áreas a reforzar.',
+            Text(
+              _getSatisfactionMessage(nps),
               textAlign: TextAlign.center,
-              style: TextStyle(fontWeight: FontWeight.w500),
+              style: const TextStyle(fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 20),
             Container(
@@ -42,53 +111,44 @@ class Dashboard extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _buildSatisfactionBar(context, satisfaction),
+                  _buildSatisfactionBar(context, nps),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Los clientes reportan una satisfacción del 50%',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  Text(
+                    'Los clientes reportan una satisfacción del ${(nps * 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 20),
-
-                  // Producto dañado
-                  const Text(
-                    '2%',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  Text(
+                    '${damageRate.toStringAsFixed(2)}%',
+                    style: const TextStyle(
+                        fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                  const Text(
-                    '% productos dañados',
-                    style: TextStyle(fontWeight: FontWeight.w500),
-                  ),
+                  const Text('% productos dañados',
+                      style: TextStyle(fontWeight: FontWeight.w500)),
                   const Text(
                     '¡Cuidado! Este dato puede afectar la imagen del negocio.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 20),
-
-                  // No disponibles
-                  const Text(
-                    '20%',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  Text(
+                    '${outOfStock.toStringAsFixed(2)}%',
+                    style: const TextStyle(
+                        fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                  const Text(
-                    '% productos no disponibles solicitados',
-                    style: TextStyle(fontWeight: FontWeight.w500),
-                  ),
+                  const Text('% productos no disponibles solicitados',
+                      style: TextStyle(fontWeight: FontWeight.w500)),
                   const Text(
                     '¡Atención! La demanda superó la disponibilidad.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 20),
-
-                  // Existencia
-                  const Text(
-                    '80%',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  Text(
+                    '${fillRate.toStringAsFixed(2)}%',
+                    style: const TextStyle(
+                        fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                  const Text(
-                    '% productos en existencia y provistos',
-                    style: TextStyle(fontWeight: FontWeight.w500),
-                  ),
+                  const Text('% productos en existencia y provistos',
+                      style: TextStyle(fontWeight: FontWeight.w500)),
                   const Text(
                     'Inventario alineado con lo que el cliente necesita.',
                     textAlign: TextAlign.center,
@@ -100,7 +160,16 @@ class Dashboard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.pushNamed(
+                    context,
+                    '/record',
+                    arguments: {
+                      'id': widget.storeId,
+                      'userId': widget.userId,
+                    },
+                  );
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                   shape: RoundedRectangleBorder(
@@ -117,7 +186,6 @@ class Dashboard extends StatelessWidget {
     );
   }
 
-  /// Widget personalizado para barra de satisfacción
   Widget _buildSatisfactionBar(BuildContext context, double satisfaction) {
     return Column(
       children: [
@@ -141,46 +209,33 @@ class Dashboard extends StatelessWidget {
 
             return Stack(
               children: [
-                // Barra de colores segmentada
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Row(
                     children: const [
                       Expanded(
-                        child: SizedBox(
-                          height: 10,
-                          child: ColoredBox(color: Colors.red),
-                        ),
+                        child:
+                            SizedBox(height: 10, child: ColoredBox(color: Colors.red)),
                       ),
                       Expanded(
                         child: SizedBox(
-                          height: 10,
-                          child: ColoredBox(color: Colors.orange),
-                        ),
+                            height: 10, child: ColoredBox(color: Colors.orange)),
                       ),
                       Expanded(
                         child: SizedBox(
-                          height: 10,
-                          child: ColoredBox(color: Colors.yellow),
-                        ),
+                            height: 10, child: ColoredBox(color: Colors.yellow)),
                       ),
                       Expanded(
                         child: SizedBox(
-                          height: 10,
-                          child: ColoredBox(color: Colors.lightBlue),
-                        ),
+                            height: 10, child: ColoredBox(color: Colors.lightBlue)),
                       ),
                       Expanded(
-                        child: SizedBox(
-                          height: 10,
-                          child: ColoredBox(color: Colors.green),
-                        ),
+                        child:
+                            SizedBox(height: 10, child: ColoredBox(color: Colors.green)),
                       ),
                     ],
                   ),
                 ),
-
-                // Indicador circular blanco
                 Positioned(
                   top: -3,
                   left: leftOffset,
